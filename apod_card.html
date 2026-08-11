@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      width: 1400px;
+      background: #e9edf2;
+      font-family: "Microsoft YaHei", "Noto Sans SC", Arial, sans-serif;
+      color: #172033;
+    }
+
+    body {
+      padding: 32px;
+    }
+
+    .card {
+      width: 1336px;
+      overflow: hidden;
+      border: 1px solid #d7dee8;
+      border-radius: 20px;
+      background: #ffffff;
+      box-shadow: 0 14px 38px rgba(22, 33, 52, 0.16);
+    }
+
+    .masthead {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 94px;
+      padding: 22px 34px;
+      color: #ffffff;
+      background: #111827;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 30px;
+      font-weight: 700;
+    }
+
+    .mark {
+      display: grid;
+      width: 46px;
+      height: 46px;
+      place-items: center;
+      border: 1px solid rgba(255, 255, 255, 0.34);
+      border-radius: 50%;
+      background: #2563eb;
+      font-size: 25px;
+    }
+
+    .date {
+      color: #cbd5e1;
+      font-size: 22px;
+    }
+
+    .media {
+      width: 100%;
+      background: #070b13;
+    }
+
+    .media img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .content {
+      padding: 34px 38px 40px;
+    }
+
+    .title-label,
+    .explanation-label {
+      margin-bottom: 9px;
+      color: #64748b;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .title {
+      margin: 0;
+      color: #111827;
+      font-size: 36px;
+      font-weight: 700;
+      line-height: 1.38;
+      overflow-wrap: anywhere;
+    }
+
+    .divider {
+      height: 1px;
+      margin: 28px 0;
+      background: #e2e8f0;
+    }
+
+    .explanation {
+      margin: 0;
+      color: #334155;
+      font-size: 24px;
+      line-height: 1.72;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .video-notice {
+      padding: 76px 58px 82px;
+      text-align: center;
+    }
+
+    .video-icon {
+      margin-bottom: 26px;
+      font-size: 76px;
+    }
+
+    .video-title {
+      margin: 0 0 20px;
+      font-size: 36px;
+      line-height: 1.4;
+    }
+
+    .video-text {
+      margin: 0;
+      color: #475569;
+      font-size: 25px;
+      line-height: 1.7;
+    }
+  </style>
+</head>
+<body>
+  <article class="card">
+    <header class="masthead">
+      <div class="brand">
+        <span class="mark">✦</span>
+        <span>NASA 每日天文图</span>
+      </div>
+      <div class="date">{{ date }}</div>
+    </header>
+
+    {% if is_image %}
+    <section class="media">
+      <img src="{{ image_src }}" alt="NASA Astronomy Picture of the Day">
+    </section>
+    <section class="content">
+      <div class="title-label">今日主题</div>
+      <h1 class="title">{{ title }}</h1>
+      {% if show_explanation %}
+      <div class="divider"></div>
+      <div class="explanation-label">天文说明</div>
+      <p class="explanation">{{ explanation }}</p>
+      {% endif %}
+    </section>
+    {% else %}
+    <section class="video-notice">
+      <div class="video-icon">▶</div>
+      <h1 class="video-title">今日 APOD 为视频内容</h1>
+      <p class="video-text">{{ video_notice }}</p>
+    </section>
+    {% endif %}
+  </article>
+</body>
+</html>

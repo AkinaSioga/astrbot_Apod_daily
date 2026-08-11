@@ -1,0 +1,42 @@
+{
+  "api_key": {
+    "description": "NASA API Key",
+    "type": "string",
+    "default": "DEMO_KEY",
+    "hint": "可在 https://api.nasa.gov/ 申请；不配置时使用 DEMO_KEY。"
+  },
+  "target_group_id": {
+    "description": "每日推送目标 QQ 群号",
+    "type": "string",
+    "default": "",
+    "hint": "可填写一个或多个 QQ 群号；多个群号用英文逗号、中文逗号、分号、空格或换行分隔。"
+  },
+  "push_time": {
+    "description": "每日推送时间，24小时制，按 AstrBot 服务器本地时间，例如 9:00 或 14:30",
+    "type": "string",
+    "default": "14:00"
+  },
+  "send_explanation": {
+    "description": "是否发送 APOD 中文说明",
+    "type": "bool",
+    "default": true
+  },
+  "translate_enabled": {
+    "description": "是否使用 AstrBot 已配置的 LLM 翻译 APOD 说明",
+    "type": "bool",
+    "default": true
+  },
+  "translator_provider_id": {
+    "description": "用于翻译的 AstrBot LLM Provider ID。留空则使用当前会话默认 Provider",
+    "type": "string",
+    "default": "",
+    "_special": "select_provider",
+    "hint": "可从 AstrBot WebUI 已配置的 LLM Provider 中下拉选择；留空时，/apod 使用当前会话默认 Provider，定时推送使用全局默认 Provider。"
+  },
+  "explanation_word_limit": {
+    "description": "APOD 英文说明最大单词数，超过后不翻译也不输出完整说明",
+    "type": "int",
+    "default": 250
+  }
+}
+
