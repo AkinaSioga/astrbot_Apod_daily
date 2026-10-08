@@ -1,9 +1,9 @@
 {
   "api_key": {
-    "description": "NASA API Key",
+    "description": "NASA API Key（旧版兼容项）",
     "type": "string",
     "default": "DEMO_KEY",
-    "hint": "可在 https://api.nasa.gov/ 申请；不配置时使用 DEMO_KEY。"
+    "hint": "新版 NASA Science APOD 接口无需 API Key；此配置仅为兼容旧版保留。"
   },
   "target_group_id": {
     "description": "每日推送目标 QQ 群号",
@@ -39,4 +39,3 @@
     "default": 250
   }
 }
-

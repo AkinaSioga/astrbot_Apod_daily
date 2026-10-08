@@ -12,7 +12,7 @@ AstrBot 的 NASA APOD（Astronomy Picture of the Day，每日天文图）插件�
 
 | 配置项 | 默认值 | 说明 |
 | --- | --- | --- |
-| `api_key` | `DEMO_KEY` | NASA API Key |
+| `api_key` | `DEMO_KEY` | 旧配置兼容项，新接口不使用 |
 | `target_group_id` | 空 | 目标 QQ 群号；多个群可用英文/中文逗号、分号、空格或换行分隔 |
 | `push_time` | `14:00` | 每日推送时间，24 小时制，按 AstrBot 服务器本地时间执行 |
 | `send_explanation` | `true` | 是否发送 APOD 说明 |
@@ -22,7 +22,9 @@ AstrBot 的 NASA APOD（Astronomy Picture of the Day，每日天文图）插件�
 
 `push_time` 支持 `9:00`、`09:00`、`14:30`、`23:59`。建议设置为 `14:00` 或更晚，避免 NASA 当天内容尚未更新。
 
-NASA `DEMO_KEY` 有较严格的请求限额。可前往 <https://api.nasa.gov/> 免费申请个人 API Key。
+新版直接使用 NASA Science 官方接口 `https://science.nasa.gov/wp-json/wp/v2/apod-basic`，无需 API Key。旧 `api_key` 配置保留以兼容现有安装，不会发送到新接口。
+
+接口默认返回最近多日的列表，插件按日期选择最新已发布内容（可能早于服务器当天日期）。说明中的 HTML 会先清理，再统计单词数和翻译。图片只使用 `hdurl`；新接口的 `url` 是文章页面，不作为图片下载地址。
 
 ## 指令
 
@@ -40,4 +42,9 @@ APOD 有时是视频。遇到非图片内容时，插件会发送一张提示卡
 插件在 `data/apod_cache.json` 保存 APOD 内容、翻译和各群推送记录，在 `data/images/` 保存当天图片。定时任务对同一个 APOD 日期只向同一个群成功推送一次；手动 `/apod` 和测试 `/apod_test` 不受此限制。
 
 插件会在执行 `/apod` 或 `/apod_test` 时通过 `event.get_platform_id()` 自动记录当前机器人平台实例，并用它为目标群构造 AstrBot UMO。建议安装或更换 NapCat 机器人账号后先执行一次 `/apod_test`，确认主动推送正常；平台 ID 会保存在 `data/apod_cache.json` 中供定时推送复用。
-"# astrbot_Apod_daily" 
+
+## 1.0.1 数据源迁移
+
+从旧 NASA API 迁移到 NASA Science；旧接口计划于 2026 年 12 月 1 日下线。升级后旧格式内容缓存会重新获取和处理，图片按日期及 URL 指纹缓存，避免继续使用旧接口误返回的 NASA Logo。同一天已有的成功推送记录保留；需要重新查看更新后的图片时使用 `/apod`，或用 `/apod_test` 主动测试群推送。
+
+图片下载会检查响应类型和非空内容。图片下载或翻译失败仍按原逻辑回退并记录警告；API 数据缺失、无效或返回 NASA Logo 时明确报错，不缓存为正常 APOD。

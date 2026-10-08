@@ -1,7 +1,9 @@
 import asyncio
 import base64
+import hashlib
 import json
 import re
+from html.parser import HTMLParser
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -14,16 +16,40 @@ from astrbot.api.event import AstrMessageEvent, MessageChain, filter
 from astrbot.api.star import Context, Star, register
 
 
-APOD_API_URL = "https://api.nasa.gov/planetary/apod"
+APOD_API_URL = "https://science.nasa.gov/wp-json/wp/v2/apod-basic"
 APOD_TIMEOUT_SECONDS = 8.0
 APOD_MAX_ATTEMPTS = 3
+CACHE_VERSION = 2
+
+
+class _PlainTextParser(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+
+    def handle_data(self, data):
+        self.parts.append(data)
+
+    def handle_starttag(self, tag, attrs):
+        if tag in {"br", "p", "div", "li"}:
+            self.parts.append(" ")
+
+    def handle_endtag(self, tag):
+        if tag in {"p", "div", "li"}:
+            self.parts.append(" ")
+
+
+def _plain_text(value: Any) -> str:
+    parser = _PlainTextParser()
+    parser.feed(str(value or ""))
+    return " ".join("".join(parser.parts).split())
 
 
 @register(
     "apod_daily",
     "Akina",
     "每日推送 NASA APOD 天文图片",
-    "1.0.0",
+    "1.0.1",
 )
 class ApodDailyPlugin(Star):
     def __init__(self, context: Context, config: dict | None = None):
@@ -122,7 +148,6 @@ class ApodDailyPlugin(Star):
             try:
                 response = httpx.get(
                     APOD_API_URL,
-                    params={"api_key": self.api_key},
                     timeout=APOD_TIMEOUT_SECONDS,
                     follow_redirects=True,
                 )
@@ -135,15 +160,47 @@ class ApodDailyPlugin(Star):
                     data = response.json()
                 except Exception as exc:
                     raise RuntimeError(f"JSON 解析失败：{exc}") from exc
-                if not isinstance(data, dict):
-                    raise RuntimeError("API 返回的 JSON 不是对象")
-                return data
+                return self._normalize_apod(data)
             except Exception as exc:
                 last_error = exc
                 logger.warning(
                     f"NASA APOD 请求失败（第 {attempt}/{APOD_MAX_ATTEMPTS} 次）：{exc}"
                 )
         raise RuntimeError(str(last_error or "未知错误"))
+
+    @staticmethod
+    def _normalize_apod(data: Any) -> dict:
+        # 新接口默认返回最近多日列表；按 APOD 日期选择，不能依赖列表顺序。
+        entries = data if isinstance(data, list) else [data]
+        if not entries or any(not isinstance(item, dict) for item in entries):
+            raise RuntimeError("APOD API 返回了空列表或无效记录")
+        for item in entries:
+            date = item.get("date")
+            if not isinstance(date, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+                raise RuntimeError("APOD API 返回了无效日期")
+            datetime.strptime(date, "%Y-%m-%d")
+        item = max(entries, key=lambda entry: entry["date"])
+        title = _plain_text(item.get("title"))
+        media_type = str(item.get("media_type") or "").lower()
+        if not title or media_type not in {"image", "video", "iframe"}:
+            raise RuntimeError("APOD API 缺少有效标题或媒体类型")
+        # 新接口的 url 是文章页，不能作为图片兜底。
+        image_url = str(item.get("hdurl") or "").strip()
+        if media_type == "image":
+            parsed = urlparse(image_url)
+            if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+                raise RuntimeError("APOD API 未返回有效图片地址")
+            if "nasa-logo" in parsed.path.lower():
+                raise RuntimeError("APOD API 错误地返回了 NASA Logo")
+        explanation = re.sub(
+            r"^Explanation:\s*", "", _plain_text(item.get("explanation")), flags=re.I
+        )
+        return {
+            "date": item["date"], "title": title,
+            "explanation": explanation, "media_type": media_type,
+            "hdurl": image_url if media_type == "image" else "",
+            "url": "", "permalink": item.get("permalink") or item.get("url") or "",
+        }
 
     def load_cache(self) -> dict:
         try:
@@ -169,6 +226,7 @@ class ApodDailyPlugin(Star):
         media_url = api_data.get("hdurl") or api_data.get("url") or ""
         return bool(
             cache
+            and cache.get("cache_version") == CACHE_VERSION
             and api_data.get("date") == cache.get("date")
             and media_url == cache.get("media_url")
         )
@@ -225,6 +283,7 @@ class ApodDailyPlugin(Star):
                 local_image_path = self.download_image_if_needed(date, media_url)
 
         payload = {
+            "cache_version": CACHE_VERSION,
             "date": date,
             "title": title,
             "title_zh": title_zh,
@@ -234,7 +293,11 @@ class ApodDailyPlugin(Star):
             "media_type": media_type,
             "media_url": media_url,
             "local_image_path": local_image_path,
-            "pushed_groups": {},
+            "pushed_groups": (
+                cache.get("pushed_groups", {})
+                if cache.get("date") == date and isinstance(cache.get("pushed_groups"), dict)
+                else {}
+            ),
             "platform_id": self.platform_id,
             "raw": api_data,
         }
@@ -340,7 +403,9 @@ class ApodDailyPlugin(Star):
             url_path = urlparse(image_url).path.lower()
             suffix = ".png" if url_path.endswith(".png") else ".webp" if url_path.endswith(".webp") else ".jpg"
             safe_date = re.sub(r"[^0-9-]", "", date) or "apod"
-            image_path = self.images_dir / f"{safe_date}{suffix}"
+            # 图片地址变化时不得复用同日期的旧图片（旧 API 曾返回 NASA Logo）。
+            url_hash = hashlib.sha256(image_url.encode("utf-8")).hexdigest()[:16]
+            image_path = self.images_dir / f"{safe_date}-{url_hash}{suffix}"
             if image_path.exists() and image_path.stat().st_size > 0:
                 return str(image_path)
 
@@ -350,9 +415,13 @@ class ApodDailyPlugin(Star):
                 follow_redirects=True,
             )
             response.raise_for_status()
-            image_path.write_bytes(response.content)
-            if image_path.stat().st_size <= 0:
+            if not response.headers.get("content-type", "").lower().startswith("image/"):
+                raise RuntimeError("下载地址未返回图片内容")
+            if not response.content:
                 raise RuntimeError("下载到的图片为空")
+            temporary_path = image_path.with_suffix(suffix + ".tmp")
+            temporary_path.write_bytes(response.content)
+            temporary_path.replace(image_path)
             return str(image_path)
         except Exception as exc:
             logger.warning(f"APOD 图片下载失败，将尝试使用网络图片：{exc}")

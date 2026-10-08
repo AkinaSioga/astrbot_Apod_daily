@@ -1,6 +1,6 @@
 name: apod_daily
 display_name: apod_daily
 desc: 每日推送 NASA APOD 天文图片
-version: 1.0.0
+version: 1.0.1
 author: Akina
 repo: "https://github.com/AkinaSioga/astrbot_Apod_daily"
